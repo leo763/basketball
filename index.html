@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falling Basketball Game</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Arya:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,700;1,400;1,500;1,700&family=Montserrat:ital,wght@0,100;0,200;0,300;0,700;0,800;0,900;1,100;1,200;1,700;1,800;1,900&family=Nabla&family=Petrona:ital,wght@0,200;0,300;0,900;1,200;1,900&family=Poppins:ital,wght@0,100;0,200;0,400;0,500;0,600;0,800;0,900;1,100;1,200;1,600;1,700;1,900&family=Rampart+One&family=Roboto:ital,wght@0,100;0,400;0,700;0,900;1,100;1,400;1,700;1,900&family=Sofia&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <script src="https://kit.fontawesome.com/a47d6090dc.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            background-color: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #grid {
+            display: flex;
+            flex-direction: column;
+        }
+
+        canvas {
+            background-color: black;
+            border: 3px;
+            border-radius: 5px;
+            /* width: 360px;
+            height: 480px; */
+            display: block;
+            margin: 10px;
+        }
+
+        #controls {
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        button {
+            font-size: 16px;
+            margin: 5px;
+            padding: 5px 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="grid">
+        <canvas id="gameCanvas" height="480" width="360"></canvas>
+        <div id="controls">
+            <i id="leftButton" class="fa fa-arrow-left m-2 border p-2 text-light"></i>
+            <i id="restartButton" class="fa fa-pause border p-2 text-light"></i>
+            <i id="rightButton" class="fa fa-arrow-right m-2 border p-2 text-light"></i>
+        </div>
+    </div>
+    <img id="basket" src="images/basket.png" style="display:none; width: 80px; height: 30px;">
+    <img id="ball" src="images/ball.png" style="display:none; width: 80px; height: 30px;">
+    <img id="bg" src="images/back.png" style="display:none; width: 80px; height: 30px;">
+    <img id="bg1" src="images/grassfield.png" style="display:none; width: 80px; height: 30px;">
+
+    <!-- Sound Effects -->
+    <audio id="captureSound" src="audio/capture.mp3"></audio>
+    <audio id="missSound" src="audio/missed.mp3"></audio>
+    <audio id="winSound" src="audio/win.mp3"></audio>
+    <audio id="loseSound" src="audio/lose.mp3"></audio>
+    <audio id="backgroundSound" src="audio/background.mp3"></audio>
+
+    <script>
+        var basketImage = document.getElementById("basket");
+        var canvas = document.getElementById("gameCanvas");
+        var ctx = canvas.getContext("2d");
+        var confetti = [];
+
+        var basket = {
+            x: 0,
+            y: canvas.height - 40,
+            width: 60,
+            height: 40,
+        };
+
+        var text = {
+            text: "SCORE: 0",
+            x: 220,
+            y: 20,
+            f: "12px Arya",
+            c: "white",
+        };
+
+        var text1 = {
+            text: "MISSED: 0",
+            x: 40,
+            y: 20,
+            f: "12px Arya",
+            c: "white",
+        };
+
+        function drawText(t, x, y, f, c) {
+            ctx.font = f;
+            ctx.fillStyle = c;
+            ctx.fillText(t, x, y);
+        }
+
+        var isP = false;
+
+        function drawPause() {
+            ctx.beginPath();
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 6;
+            ctx.moveTo(330, 10);
+            ctx.lineTo(330, 25);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 6;
+            ctx.moveTo(340, 10);
+            ctx.lineTo(340, 25);
+            ctx.stroke();
+        }
+
+        function drawPlay() {
+            ctx.beginPath();
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 6;
+            ctx.moveTo(330, 10);
+            ctx.lineTo(330, 25);
+            ctx.lineTo(340, 17.5);
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        var isFinish = false;
+
+        function drawState() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bgImage1, 0, 0, bgImage1.width, bgImage1.height, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bgImage, 0, 0, bgImage.width, bgImage.height, 0, 0, canvas.width, canvas.height);
+
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = "white";
+            ctx.strokeRect(40, canvas.height - 90, canvas.width - 80, 60);
+
+            ctx.fillStyle = "white";
+            ctx.font = "50px Arya";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("Restart", canvas.width / 2, canvas.height - 60);
+
+            ctx.fillStyle = "black";
+            ctx.fillRect(50, (canvas.height / 2) - 70, canvas.width - 100, 40);
+
+            ctx.font = "50px Arya";
+
+            if (missedBalls < 3) {
+                createConfetti();
+                ctx.fillStyle = "#adf802";
+                ctx.fillText("YOU WIN", canvas.width / 2, (canvas.height / 2) - 100);
+                // playwinSound();
+            } else {
+                ctx.fillStyle = "Red";
+                ctx.fillText("YOU LOSE", canvas.width / 2, (canvas.height / 2) - 100);
+                // playloseSound();
+            }
+
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arya";
+            ctx.fillText(text.text, canvas.width / 2, (canvas.height / 2) - 50);
+        }
+
+        var ballImage = document.getElementById("ball");
+
+        var bgImage1 = document.getElementById("bg");
+
+        var bgImage = document.getElementById("bg1");
+
+        var balls = [];
+        var firstBall = [];
+        var ballSpeed = 2;
+        var missedBalls = 0;
+        var capturedBalls = 0;
+
+        var isGamePaused = false;
+
+        document.addEventListener("keydown", handleKeyPress);
+
+        function handleKeyPress(event) {
+            if (event.key === "ArrowLeft" && basket.x > 0) {
+                basket.x -= 60;
+            } else if (event.key === "ArrowRight" && basket.x <= canvas.width - basket.width - 10) {
+                basket.x += 60;
+            }
+        }
+
+        canvas.addEventListener("touchstart", handleTouch);
+
+        function handleTouch(event) {
+            var touchX = event.touches[0].clientX;
+            if (touchX < canvas.width / 2 && basket.x > 0) {
+                basket.x -= 60;
+            } else if (touchX >= canvas.width / 2 && basket.x <= canvas.width - basket.width - 10) {
+                basket.x += 60;
+            }
+        }
+
+        var leftButton = document.getElementById("leftButton");
+        var rightButton = document.getElementById("rightButton");
+        var restartButton = document.getElementById("restartButton");
+
+        leftButton.addEventListener("click", function () {
+            if (basket.x > 0) {
+                basket.x -= 60;
+            }
+        });
+
+        rightButton.addEventListener("click", function () {
+            if (basket.x <= canvas.width - basket.width - 10) {
+                basket.x += 60;
+            }
+        });
+
+        restartButton.addEventListener("click", function () {
+            if (isGamePaused) {
+                isP = false;
+                isGamePaused = false;
+                balls = [];
+                if (firstBall.length > 2) {
+                   balls.push({ x: firstBall[2].x, y: firstBall[2].y });      
+                }
+                if (firstBall.length > 1) {
+                   balls.push({ x: firstBall[1].x, y: firstBall[1].y });      
+                }
+                balls.push({ x: firstBall[0].x, y: firstBall[0].y });
+                firstBall = [];
+                restartButton.classList.add('fa-pause');
+                restartButton.classList.remove('fa-play');
+                gameLoop();
+            } else {
+                isP = true;
+                isGamePaused = true;
+                firstBall.push({ x: balls[0].x, y: balls[0].y });
+                if (balls.length > 1) {
+                  firstBall.push({ x: balls[1].x, y: balls[1].y });    
+                }
+                if (balls.length > 2) {
+                  firstBall.push({ x: balls[2].x, y: balls[2].y });    
+                }
+                restartButton.classList.remove('fa-pause');
+                restartButton.classList.add('fa-play');
+            }
+        });
+
+        var captureSound = document.getElementById('captureSound');
+        var missSound = document.getElementById('missSound');
+        var winSound = document.getElementById('winSound');
+        var loseSound = document.getElementById('loseSound');
+
+        function playCaptureSound() {
+            captureSound.currentTime = 0;
+            captureSound.play();
+        }
+
+        function playMissSound() {
+            missSound.currentTime = 0;
+            missSound.play();
+        }
+
+        function playwinSound() {
+            winSound.currentTime = 0;
+            winSound.play();
+        }
+
+        function playloseSound() {
+            loseSound.currentTime = 0;
+            loseSound.play();
+        }
+
+        function playbacgroundSound() {
+            // backgroundSound.currentTime = 0;
+            backgroundSound.play();
+            requestAnimationFrame(playbacgroundSound);  
+        }
+        function createBall() {
+            var columns = 6;
+            var columnWidth = canvas.width / columns;
+            var columnIndex = Math.floor(Math.random() * columns);
+
+            var ball = {
+                x: columnIndex * columnWidth + 10,
+                y: 0,
+            };
+            balls.push(ball);
+        }
+
+        function updateBalls() {
+            for (var i = 0; i < balls.length; i++) {
+                var ball = balls[i];
+                ball.y += ballSpeed;
+
+                if (
+                    ball.y > basket.y &&
+                    ball.x >= basket.x &&
+                    ball.x <= basket.x + basket.width
+                ) {
+                    capturedBalls++;
+                    balls.splice(i, 1);
+                    i--;
+                    text.text = "SCORE: " + capturedBalls;
+
+                    playCaptureSound();
+                    // createBall();
+                }
+
+                if (ball.y > canvas.height) {
+                    missedBalls++;
+                    balls.splice(i, 1);
+                    i--;
+                    text1.text = "MISSED: " + missedBalls;
+
+                    playMissSound();
+                    // createBall();
+                }
+            }
+        }
+
+        var ballInterval;
+        var d;
+
+        function drawBalls() {
+            for (var i = 0; i < balls.length; i++) {
+                var ball = balls[i];
+                ctx.drawImage(ballImage, ball.x, ball.y, 40, 40);
+            }
+        }
+
+        function restartGame() {
+            capturedBalls = 0;
+            missedBalls = 0;
+            text.text = "SCORE: " + capturedBalls;
+            text1.text = "MISSED: " + missedBalls;
+            balls = [];
+            clearInterval(ballInterval);
+            clearInterval(d);
+            ballInterval = setInterval(createBall, 1500);
+        }
+
+        function gameOver() {
+            isFinish = true;
+            document.getElementById('controls').style.display = 'none';
+            if (missedBalls < 3) {
+                playwinSound();
+            }
+            else{
+                playloseSound();
+            }
+            d = setInterval(drawState, 0.001);
+        }
+
+        function gameLoop() {
+            if (!isGamePaused) {
+                if (capturedBalls < 5) {
+                //    bi = 2000;
+                   ballSpeed = 2; 
+                   
+                }
+                else if (capturedBalls >= 5 && capturedBalls <10){
+                    // bi = 500;
+                    ballSpeed = 2.5; 
+                }
+                else if (capturedBalls >= 10 && capturedBalls <15){
+                    // bi = 200;
+                    ballSpeed = 3; 
+                }
+                else if (capturedBalls >= 15 && capturedBalls <20){
+                    // bi = 100;
+                    ballSpeed = 3.5; 
+                }
+                else if (capturedBalls >= 20 && capturedBalls <25){
+                    // bi = 55;
+                    ballSpeed = 4; 
+                }
+                else{
+                    // bi = 40;
+                    ballSpeed = 5; 
+                }
+
+
+
+                if (capturedBalls < 30 && missedBalls < 3) {
+                    updateBalls();
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(bgImage1, 0, 0, bgImage1.width, bgImage1.height, 0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(bgImage, 0, 0, bgImage.width, bgImage.height, 0, 0, canvas.width, canvas.height);
+                    drawBalls();
+                    ctx.drawImage(basketImage, basket.x, basket.y, basket.width, basket.height);
+                    drawText(text.text, text.x, text.y, text.f, text.c);
+                    drawText(text1.text, text1.x, text1.y, text1.f, text1.c);
+                    if (isP) {
+                        drawPlay();
+                    } else {
+                        drawPause();
+                    }
+                    requestAnimationFrame(gameLoop);
+                } else {
+                    gameOver();
+                }
+            }
+        }
+
+        function drawButton() {
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = "white";
+            ctx.strokeRect(40, canvas.height - 90, canvas.width - 80, 60);
+
+            ctx.fillStyle = "white";
+            ctx.font = "50px Arya";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("Start", canvas.width / 2, canvas.height - 60);
+
+            ctx.fillStyle = "black";
+            ctx.fillRect(10, (canvas.height / 2) - 120, canvas.width - 20, 120);
+
+            ctx.font = "20px Arya";
+            ctx.fillStyle = "white";
+            ctx.fillText("< use leftArrowKey", canvas.width / 2, (canvas.height / 2) - 100);
+            ctx.fillText("> use rightArrowKey", canvas.width / 2, (canvas.height / 2) - 75);
+            ctx.fillText("OR", canvas.width / 2, (canvas.height / 2) - 50);
+            ctx.fillText("touch either left or right of the screen", canvas.width / 2, (canvas.height / 2) - 25);
+        }
+
+        var isStart = false;
+
+        function startPage() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bgImage1, 0, 0, bgImage1.width, bgImage1.height, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bgImage, 0, 0, bgImage.width, bgImage.height, 0, 0, canvas.width, canvas.height);
+            drawButton();
+            isStart = true;
+            document.getElementById('controls').style.display = 'none';
+
+        }
+
+        startPage();
+
+        canvas.onclick = (e) => {
+            if (isFinish) {
+                if ((e.clientX - canvas.offsetLeft) > 40 && (e.clientX - canvas.offsetLeft) < (canvas.width - 60) && (e.clientY - canvas.offsetTop) > (canvas.height - 90) && (e.clientY - canvas.offsetTop) < (canvas.height - 30)) {
+                    isFinish = false;
+                    document.getElementById('controls').style.display = '';
+                    restartGame();
+                    gameLoop();
+                }
+            }
+
+            if (isStart) {
+                if ((e.clientX - canvas.offsetLeft) > 40 && (e.clientX - canvas.offsetLeft) < (canvas.width - 60) && (e.clientY - canvas.offsetTop) > (canvas.height - 90) && (e.clientY - canvas.offsetTop) < (canvas.height - 30)) {
+                    isStart = false;
+                    document.getElementById('controls').style.display = '';
+                    ballInterval = setInterval(createBall, 1500);
+                    playbacgroundSound();
+                    gameLoop();
+
+                }
+            } else {
+                if ((e.clientX - canvas.offsetLeft) > 330 && (e.clientX - canvas.offsetLeft) < 340 && (e.clientY - canvas.offsetTop) > 10 && (e.clientY - canvas.offsetTop) < 25) {
+                    if (isGamePaused) {
+                        isGamePaused = false;
+                        isP = false;
+                        balls = [];
+                        if (firstBall.length > 1) {
+                        balls.push({ x: firstBall[1].x, y: firstBall[1].y });      
+                        }
+                        balls.push({ x: firstBall[0].x, y: firstBall[0].y });
+                        firstBall = [];
+                        restartButton.classList.add('fa-pause');
+                        restartButton.classList.remove('fa-play');
+                        gameLoop();
+                    } else {
+
+                        isGamePaused = true;
+                        isP = true;
+                        firstBall.push({ x: balls[0].x, y: balls[0].y });
+                        if (balls.length > 1) {
+                           firstBall.push({ x: balls[1].x, y: balls[1].y });    
+                        }
+                        restartButton.classList.remove('fa-pause');
+                        restartButton.classList.add('fa-play');
+                    }
+                }
+            }
+        }
+
+
+
+
+                // Add the following function
+                function createConfetti() {
+                confetti.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 8 + 2, // Random size between 2 and 7
+                    color: `rgb(${Math.random() * 255+255},${Math.random() * 255},${Math.random() * 255})`
+                });
+
+                if (confetti.length > 500) {
+                  confetti.splice(0, 10);
+                }
+                drawConfetti();
+        }
+
+        
+        // Add a new function to draw confetti particles
+        function drawConfetti() {
+        //   drawCanvas();
+            for (let i = 0; i < confetti.length; i++) {
+                ctx.fillStyle = confetti[i].color;
+                // ctx.rotate(Math.PI / 4);
+                ctx.fillRect(confetti[i].x, confetti[i].y, confetti[i].size, confetti[i].size);
+            }
+        }
+    </script>
+</body>
+
+</html>
